@@ -5,20 +5,22 @@
     <stringAttribute key="distributedNetworkInterface" value="172.20.0.1"/>
     <intAttribute key="distributedNodesCount" value="1"/>
     <stringAttribute key="distributedTLC" value="off"/>
-    <intAttribute key="fpIndex" value="105"/>
+    <intAttribute key="fpIndex" value="99"/>
     <intAttribute key="maxHeapSize" value="25"/>
     <stringAttribute key="modelBehaviorInit" value="Init"/>
     <stringAttribute key="modelBehaviorNext" value="Next"/>
-    <stringAttribute key="modelBehaviorSpec" value=""/>
-    <intAttribute key="modelBehaviorSpecType" value="2"/>
+    <stringAttribute key="modelBehaviorSpec" value="Spec"/>
+    <intAttribute key="modelBehaviorSpecType" value="1"/>
     <stringAttribute key="modelBehaviorVars" value="connReqs, connections"/>
     <stringAttribute key="modelComments" value=""/>
     <booleanAttribute key="modelCorrectnessCheckDeadlock" value="false"/>
     <listAttribute key="modelCorrectnessInvariants">
         <listEntry value="0\neg Terminated"/>
-        <listEntry value="1Safety"/>
+        <listEntry value="0Safety"/>
     </listAttribute>
-    <listAttribute key="modelCorrectnessProperties"/>
+    <listAttribute key="modelCorrectnessProperties">
+        <listEntry value="1Liveness"/>
+    </listAttribute>
     <intAttribute key="modelEditorOpenTabs" value="8"/>
     <stringAttribute key="modelExpressionEval" value=""/>
     <listAttribute key="modelParameterConstants">
@@ -32,4 +34,11 @@
     <stringAttribute key="result.mail.address" value=""/>
     <stringAttribute key="specName" value="PeerMC1"/>
     <stringAttribute key="tlcResourcesProfile" value="local custom"/>
+    <listAttribute key="traceExploreExpressions">
+        <listEntry value="1Connected(v1)"/>
+        <listEntry value="1QSetConnected(v1)"/>
+        <listEntry value="1PendingReq(v1)"/>
+        <listEntry value="1MaxConn"/>
+        <listEntry value="1ENABLED AcceptConnection(v1,v3)"/>
+    </listAttribute>
 </launchConfiguration>

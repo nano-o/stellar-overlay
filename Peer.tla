@@ -13,6 +13,8 @@ VARIABLES
     connections, \* the set of established connections
     connReqs \* connection requests
     
+vars == <<connections, connReqs>>
+    
 (***************************************************************************)
 (* The type invariant:                                                     *)
 (***************************************************************************)
@@ -83,6 +85,16 @@ AcceptConnection(v, w) ==
 Next == \E v,w \in V :
     \/ RequestConnection(v,w)
     \/ AcceptConnection(v, w)
+    
+(***************************************************************************)
+(* The full behavioral specification:                                      *)
+(***************************************************************************)
+Spec == 
+    /\ Init 
+    /\ [][Next]_vars
+    /\ \A v,w \in V : 
+        /\ WF_vars(RequestConnection(v,w))
+        /\ WF_vars(AcceptConnection(v,w))
 
 (***************************************************************************)
 (* Now we make some definition to check whether a graph is connected       *)
@@ -102,21 +114,13 @@ TraverseRec(graph, acc) ==
 (***************************************************************************)
 IsConnectedGraph(graph) ==
     TraverseRec(graph, {CHOOSE v \in V : TRUE}) = V
-    
-(***************************************************************************)
-(* We are done when no new connections can be requested or accepted:       *)
-(***************************************************************************)
-Terminated == \A v,w \in V :
-    /\ \neg ENABLED RequestConnection(v,w)
-    /\ \neg ENABLED AcceptConnection(v,w)
 
 (***************************************************************************)
-(* In the steady-state, we must have a connected graph:                    *)
-(***************************************************************************)    
-Safety == Terminated => IsConnectedGraph(connections)
-\* TODO: we could also make this a temporal property, i.e. eventually we must get a connected graph
+(* Eventually, we must obtain a connected graph:                           *)
+(***************************************************************************)
+Liveness == <>(IsConnectedGraph(connections))
 
 =============================================================================
 \* Modification History
-\* Last modified Tue Feb 28 18:33:04 PST 2023 by nano
+\* Last modified Wed Mar 01 10:03:15 PST 2023 by nano
 \* Created Tue Feb 28 16:44:22 PST 2023 by nano

@@ -8,13 +8,12 @@ CONSTANTS
     MaxConn, \* maximum number of connections that a validator will maintain
     QSetConn \* target number of connections to qset members
 
-(***************************************************************************)
-(* Initially we assume that all peers have been discovered.                *)
-(***************************************************************************)
 
 VARIABLES
     connections, \* the set of established connections
     connReqs \* connection requests
+    
+vars == <<connections, connReqs>>
     
 (***************************************************************************)
 (* The type invariant:                                                     *)
@@ -67,7 +66,7 @@ PendingReq(v) == {w \in V : <<w,v>> \in connReqs}
 (***************************************************************************)
 AcceptConnection(v, w) ==
     /\  w \in PendingReq(v) \* w has sent a request to v
-    /\  w \notin Connected(v) \* v is not already connected to v
+    /\  w \notin Connected(v) \* v is not already connected to w
     /\  IF Cardinality(Connected(v)) < MaxConn
         THEN \* we accept the connection
             /\ connections' = connections \union {{v, w}} \* we accept the connection
@@ -86,34 +85,42 @@ AcceptConnection(v, w) ==
 Next == \E v,w \in V :
     \/ RequestConnection(v,w)
     \/ AcceptConnection(v, w)
+    
+(***************************************************************************)
+(* The full behavioral specification:                                      *)
+(***************************************************************************)
+Spec == 
+    /\ Init 
+    /\ [][Next]_vars
+    /\ \A v,w \in V : 
+        /\ WF_vars(RequestConnection(v,w))
+        /\ WF_vars(AcceptConnection(v,w))
 
 (***************************************************************************)
 (* Now we make some definition to check whether a graph is connected       *)
 (***************************************************************************)
 
-RECURSIVE TraverseRec(_, _)
+\* Breadth-first traversal, accumulating vertices in acc:
+RECURSIVE TraverseRec(_, _) 
 TraverseRec(graph, acc) == 
     LET newVs == {w \in V \ acc : \E v \in acc : {v,w} \in graph}
     IN IF newVs # {}
         THEN TraverseRec(graph, acc \union newVs)
         ELSE acc  
         
+(***************************************************************************)
+(* A graph is connected iff, starting from any vertice, the traversal      *)
+(* reaches all vertices:                                                   *)
+(***************************************************************************)
 IsConnectedGraph(graph) ==
     TraverseRec(graph, {CHOOSE v \in V : TRUE}) = V
-    
-(***************************************************************************)
-(* We are done when no new connections can be requested or accepted:       *)
-(***************************************************************************)
-Terminated == \A v,w \in V :
-    /\ \neg ENABLED RequestConnection(v,w)
-    /\ \neg ENABLED AcceptConnection(v,w)
 
 (***************************************************************************)
-(* In the steady-state, we must have a connected graph:                    *)
-(***************************************************************************)    
-Safety == Terminated => IsConnectedGraph(connections)
+(* Eventually, we must obtain a connected graph:                           *)
+(***************************************************************************)
+Liveness == <>(IsConnectedGraph(connections))
 
 =============================================================================
 \* Modification History
-\* Last modified Tue Feb 28 18:13:34 PST 2023 by nano
+\* Last modified Wed Mar 01 10:03:15 PST 2023 by nano
 \* Created Tue Feb 28 16:44:22 PST 2023 by nano
