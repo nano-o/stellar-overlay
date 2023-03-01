@@ -36,7 +36,7 @@ Connected(v) == {w \in V : {v,w} \in connections}
 (***************************************************************************)
 (* the set of validators w in v's qset that v has a connection with:       *)
 (***************************************************************************)
-QSetConnected(v) == {w \in Connected(v) : w \in QSet(v)}
+QSetConnected(v) == Connected(v) \cap QSet(v)
     
 (***************************************************************************)
 (* v can request a connection to w as long as v has not reached its        *)
@@ -97,7 +97,7 @@ Spec ==
         /\ WF_vars(AcceptConnection(v,w))
 
 (***************************************************************************)
-(* Now we make some definition to check whether a graph is connected       *)
+(* Now we make some definitions to check whether a graph is connected      *)
 (***************************************************************************)
 
 \* Breadth-first traversal, accumulating vertices in acc:
@@ -122,5 +122,5 @@ Liveness == <>(IsConnectedGraph(connections))
 
 =============================================================================
 \* Modification History
-\* Last modified Wed Mar 01 10:03:15 PST 2023 by nano
+\* Last modified Wed Mar 01 10:09:32 PST 2023 by nano
 \* Created Tue Feb 28 16:44:22 PST 2023 by nano

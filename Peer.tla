@@ -1,13 +1,19 @@
 -------------------------------- MODULE Peer --------------------------------
 
+(***************************************************************************)
+(* We specify in TLA+ the process of establishing connections between      *)
+(* validators in the Stellar network.  This does not reflect the current   *)
+(* implementation.                                                         *)
+(***************************************************************************)
+
 EXTENDS FiniteSets, Naturals, TLC
 
 CONSTANTS
     V, \* the validators
     QSet(_), \* the qsets of the validators
-    MaxConn, \* maximum number of connections that a validator will maintain
-    QSetConn \* target number of connections to qset members
-
+    TargetOutbound, \* target number of outbound connections
+    MaxInbound, \* max number of inbound connections
+    TargetQSet \* target number of total connections to qset members
 
 VARIABLES
     connections, \* the set of established connections
@@ -19,8 +25,9 @@ vars == <<connections, connReqs>>
 (* The type invariant:                                                     *)
 (***************************************************************************)
 TypeOkay ==
-    /\ connections \in SUBSET {{v1,v2} : v1,v2 \in V} \* connections are undirected
-    /\ connReqs \in {<<v1,v2>> : v1,v2 \in V} \* request from v1 to connect with v2
+    \* A connection is a pair (order matters for the inbound/outbound classification):
+    /\ connections \in SUBSET {<<v,w>> : v,w \in V}
+    /\ connReqs \in SUBSET {<<v,w>> : v,w \in V} \* request from v1 to connect with v2
 
 (***************************************************************************)
 (* The initial state:                                                      *)
@@ -32,23 +39,34 @@ Init ==
 (***************************************************************************)
 (* the set of validators w that v has a connection with:                   *)
 (***************************************************************************)
-Connected(v) == {w \in V : {v,w} \in connections}
+Connected(v) == {w \in V : <<v,w>> \in connections \/ <<w,v>> \in connections}
+
+(***************************************************************************)
+(* Inbound and outbound connections of v:                                  *)
+(***************************************************************************)
+ConnectedInbound(v) == {w \in V : <<w,v>> \in connections}
+NumInbound(v) == Cardinality(ConnectedInbound(v))
+ConnectedOutbound(v) == {w \in V : <<v,w>> \in connections}
+NumOutbound(v) == Cardinality(ConnectedOutbound(v))
+
 (***************************************************************************)
 (* the set of validators w in v's qset that v has a connection with:       *)
 (***************************************************************************)
-QSetConnected(v) == {w \in Connected(v) : w \in QSet(v)}
+QSetConnected(v) == Connected(v) \cap QSet(v)
+NumQSetConns(v) == Cardinality(QSetConnected(v))
     
 (***************************************************************************)
-(* v can request a connection to w as long as v has not reached its        *)
-(* maximum number of connections or, if w is in v's qset, as long as v has *)
-(* not reached its target number of qset connections:                      *)
+(* v can request a connection to w as long as v has not reached its target *)
+(* number of outbound connections or, if w is in v's qset, as long as v    *)
+(* has not reached its target number of qset connections.                  *)
 (***************************************************************************)
 RequestConnection(v, w) ==
     /\ v # w \* do not connect to self
     /\ w \notin Connected(v) \* v is not connected to w already
     /\ <<v,w>> \notin connReqs \* v hasn't sent a connection request to w already
-    /\ \/ Cardinality(Connected(v)) < MaxConn
-       \/ w \in QSet(v) /\ Cardinality(QSetConnected(v)) < QSetConn
+    /\ \/ NumOutbound(v) < TargetOutbound
+       \/ w \in QSet(v) /\ NumQSetConns(v) < TargetQSet
+       \* Note that with this rule we might exceed our target number of outbound connections
     /\ connReqs' = connReqs \union {<<v,w>>}
     /\ UNCHANGED connections
 
@@ -56,6 +74,14 @@ RequestConnection(v, w) ==
 (* The set of validators that have sent a connection request to v:         *)
 (***************************************************************************)
 PendingReq(v) == {w \in V : <<w,v>> \in connReqs}
+
+ConnectionTo(v, w) ==
+    IF w \in Connected(v)
+    THEN
+        IF <<v,w>> \in connections
+        THEN <<v,w>>
+        ELSE <<w,v>>
+    ELSE <<>>
 
 (***************************************************************************)
 (* v accepts a connection request from w if v has not reached its max      *)
@@ -67,15 +93,15 @@ PendingReq(v) == {w \in V : <<w,v>> \in connReqs}
 AcceptConnection(v, w) ==
     /\  w \in PendingReq(v) \* w has sent a request to v
     /\  w \notin Connected(v) \* v is not already connected to w
-    /\  IF Cardinality(Connected(v)) < MaxConn
+    /\  IF NumInbound(v) < MaxInbound
         THEN \* we accept the connection
-            /\ connections' = connections \union {{v, w}} \* we accept the connection
+            /\ connections' = connections \union {<<w,v>>} \* we accept the connection
             /\ connReqs' = connReqs \ {<<w, v>>} \* remove the connection request
         ELSE \* v already has MaxConn connections, but maybe it does not have enough qset connections
-            IF w \in QSet(v) /\ Cardinality(QSetConnected(v)) < QSetConn
-            THEN \E x \in Connected(v) \ QSetConnected(v) :
+            IF w \in QSet(v) /\ NumQSetConns(v) < TargetQSet
+            THEN \E x \in Connected(v) \ QSetConnected(v) : \* TODO: prefer removing inbound or outbound?
                 \* we accept the connection to w but we disconnect from x:
-                /\ connections' = (connections \union {{v, w}}) \ {{v, x}}
+                /\ connections' = (connections \union {<<w,v>>}) \ {ConnectionTo(v, x)}
                 /\ connReqs' = connReqs \ {<<w, v>>} \* remove the connection request
             ELSE UNCHANGED <<connections, connReqs>>
             
@@ -97,13 +123,14 @@ Spec ==
         /\ WF_vars(AcceptConnection(v,w))
 
 (***************************************************************************)
-(* Now we make some definition to check whether a graph is connected       *)
+(* Now we make some definitions to check whether a graph is connected      *)
 (***************************************************************************)
 
 \* Breadth-first traversal, accumulating vertices in acc:
 RECURSIVE TraverseRec(_, _) 
 TraverseRec(graph, acc) == 
-    LET newVs == {w \in V \ acc : \E v \in acc : {v,w} \in graph}
+    LET newVs == {w \in V \ acc : 
+            \E v \in acc : <<v,w>> \in graph \/ <<w,v>> \in graph}
     IN IF newVs # {}
         THEN TraverseRec(graph, acc \union newVs)
         ELSE acc  
@@ -122,5 +149,5 @@ Liveness == <>(IsConnectedGraph(connections))
 
 =============================================================================
 \* Modification History
-\* Last modified Wed Mar 01 10:03:15 PST 2023 by nano
+\* Last modified Wed Mar 01 12:16:06 PST 2023 by nano
 \* Created Tue Feb 28 16:44:22 PST 2023 by nano
